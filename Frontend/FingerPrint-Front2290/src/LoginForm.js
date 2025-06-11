@@ -1,57 +1,53 @@
-"use client"
 
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import * as Components from "./Components"
-import { FaUserGraduate, FaChalkboardTeacher, FaLock, FaUserShield, FaGlobe } from "react-icons/fa"
-import { useLanguage } from "./contexts/LanguageContext"
-
-const users = [
-  { email: "doctor@example.com", password: "doctor123", role: "Doctor" },
-  {
-    email: "student@example.com",
-    password: "student123",
-    role: "Student",
-    name: "David Rezaik",
-    department: "Computer Science",
-    year: "4th Year",
-  },
-  { email: "admin@example.com", password: "admin123", role: "Admin" },
-]
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import * as Components from "./Components";
+import { FaUserGraduate, FaChalkboardTeacher, FaLock, FaUserShield, FaGlobe } from "react-icons/fa";
+import { useLanguage } from "./contexts/LanguageContext";
 
 function LoginForm() {
-  const navigate = useNavigate()
-  const { language, toggleLanguage, t } = useLanguage()
-  const [signIn, setSignIn] = useState("student")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate();
+  const { language, toggleLanguage, t } = useLanguage();
+  const [signIn, setSignIn] = useState("student");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Force LTR for login page
-    document.body.classList.remove("rtl")
-    document.body.dir = "ltr"
-  }, [])
+    document.body.classList.remove("rtl");
+    document.body.dir = "ltr";
+  }, []);
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    setTimeout(() => {
-      const user = users.find((u) => u.email === email && u.password === password)
-      if (user) {
-        localStorage.setItem("user", JSON.stringify(user))
-        if (user.role === "Doctor") navigate("/doctor-dashboard")
-        else if (user.role === "Student") navigate("/student-dashboard")
-        else if (user.role === "Admin") navigate("/admin-dashboard")
+    try {
+      const res = await fetch("https://192.168.1.6:7069/api/account/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        localStorage.setItem("user", JSON.stringify(data));
+
+        if (data.userType === "Student") navigate("/student-dashboard");
+        else if (data.userType === "Doctor") navigate("/doctor-dashboard");
+        else if (data.userType === "Admin") navigate("/admin-dashboard");
       } else {
-        setError(t("Invalid credentials. Please try again."))
+        setError(data?.message || t("Invalid credentials. Please try again."));
       }
-      setLoading(false)
-    }, 1000)
-  }
+    } catch {
+      setError("❌ Server error. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="login-page">
@@ -141,7 +137,7 @@ function LoginForm() {
         </p>
       </div>
     </div>
-  )
+  );
 }
 
-export default LoginForm
+export default LoginForm;
