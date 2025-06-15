@@ -3,45 +3,135 @@ import { FaPlus } from "react-icons/fa";
 import "../dashboard.css";
 
 const daysOfWeek = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
-const years = ["1", "2", "3", "4"];
 
 function ManageSchedule() {
-  const [selectedYear, setSelectedYear] = useState("1");
-  const [schedule, setSchedule] = useState([]);
+  const [selectedFaculty, setSelectedFaculty] = useState("");
+  const [selectedYear, setSelectedYear] = useState("");
+
+  const [faculties, setFaculties] = useState([]);
+  const [facultyYears, setFacultyYears] = useState([]);
+  const [filteredYears, setFilteredYears] = useState([]);
+
   const [courses, setCourses] = useState([]);
-  const [form, setForm] = useState({ day: "Saturday", course: "", doctor: "", from: "", to: "" });
+  const [rooms, setRooms] = useState([]);
+  const [newRoom, setNewRoom] = useState("");
+
+  const [schedule, setSchedule] = useState([]);
+
+  const [form, setForm] = useState({
+    day: "Saturday",
+    course: "",
+    doctor: "",
+    room: "",
+    from: "",
+    to: "",
+  });
+
+  const BASE_URL = "http://localhost:7069";
 
   useEffect(() => {
-    const savedCourses = JSON.parse(localStorage.getItem("courses")) || [];
-    const savedSchedule = JSON.parse(localStorage.getItem("schedule")) || [];
-    setCourses(savedCourses);
-    setSchedule(savedSchedule);
+    fetch(`${BASE_URL}/api/Faculty/GetAllFaculty`)
+      .then(res => res.json())
+      .then(data => setFaculties(data))
+      .catch(err => console.error("Error loading faculties:", err));
+
+    fetch(`${BASE_URL}/api/FacultyYear/GetAllFacultyYear`)
+      .then(res => res.json())
+      .then(data => setFacultyYears(data))
+      .catch(err => console.error("Error loading faculty years:", err));
+
+    fetch(`${BASE_URL}/api/Subjects/GetAllSubjects`)
+      .then(res => res.json())
+      .then(data => setCourses(data))
+      .catch(err => console.error("Error loading subjects:", err));
+
+    fetchRooms();
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("schedule", JSON.stringify(schedule));
-  }, [schedule]);
+    if (selectedFaculty) {
+      const matchedFac = faculties.find(f => f.fac_Name === selectedFaculty);
+      if (matchedFac) {
+        const filtered = facultyYears.filter(y => y.facultyId === matchedFac.id);
+        setFilteredYears(filtered);
+        setSelectedYear("");
+      }
+    } else {
+      setFilteredYears([]);
+      setSelectedYear("");
+    }
+  }, [selectedFaculty, facultyYears]);
 
-  const handleAdd = () => {
-    if (!form.course || !form.doctor || !form.from || !form.to) return alert("All fields required");
-    const newEntry = { ...form, year: selectedYear };
-    setSchedule([...schedule, newEntry]);
-    setForm({ day: "Saturday", course: "", doctor: "", from: "", to: "" });
+  const fetchRooms = () => {
+    fetch(`${BASE_URL}/api/Rooms/GetAllRooms`)
+      .then(res => res.json())
+      .then(data => setRooms(data))
+      .catch(err => console.error("Error loading rooms:", err));
   };
 
-  const filteredSchedule = schedule.filter((s) => s.year === selectedYear);
+  const handleAdd = () => {
+    const { course, doctor, room, from, to } = form;
+    if (!selectedFaculty || !selectedYear || !course || !doctor || !room || !from || !to) {
+      return alert("All fields are required");
+    }
+
+    const newEntry = {
+      ...form,
+      faculty: selectedFaculty,
+      year: selectedYear,
+      department: selectedFaculty
+    };
+
+    setSchedule([...schedule, newEntry]);
+    setForm({ day: "Saturday", course: "", doctor: "", room: "", from: "", to: "" });
+  };
+
+  const handleAddRoom = async () => {
+    if (!newRoom.trim()) return;
+
+    const roomObj = { id: 0, room_Num: newRoom.trim() };
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/Rooms/Add_OR_UpdateRoom`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(roomObj),
+      });
+
+      if (res.ok) {
+        setNewRoom("");
+        fetchRooms();
+      } else {
+        alert("Failed to add room.");
+      }
+    } catch (error) {
+      console.error("Error adding room:", error);
+    }
+  };
+
+  const filteredSchedule = schedule.filter(
+    (s) => s.year === selectedYear && s.faculty === selectedFaculty
+  );
 
   return (
     <div className="section-layout">
       <div className="section-header">
         <h1>Manage Schedule</h1>
-        <p className="subtitle">Set course times for each year and day</p>
+        <p className="subtitle">Set course times for each year, faculty, department, and room</p>
       </div>
 
       <div className="form-grid">
+        <select value={selectedFaculty} onChange={(e) => setSelectedFaculty(e.target.value)}>
+          <option value="" disabled>Select Faculty</option>
+          {faculties.map((fac) => (
+            <option key={fac.id} value={fac.fac_Name}>{fac.fac_Name}</option>
+          ))}
+        </select>
+
         <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
-          {years.map((y) => (
-            <option key={y} value={y}>Year {y}</option>
+          <option value="" disabled>Select Year</option>
+          {filteredYears.map((y) => (
+            <option key={y.id} value={y.year}>{y.year}</option>
           ))}
         </select>
 
@@ -67,22 +157,30 @@ function ManageSchedule() {
             ))}
         </select>
 
-        <input
-          type="time"
-          value={form.from}
-          onChange={(e) => setForm({ ...form, from: e.target.value })}
-          placeholder="From"
-        />
-        <input
-          type="time"
-          value={form.to}
-          onChange={(e) => setForm({ ...form, to: e.target.value })}
-          placeholder="To"
-        />
+        <select value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })}>
+          <option value="" disabled>Select Room</option>
+          {rooms.map((room, i) => (
+            <option key={i} value={room.room_Num}>{room.room_Num}</option>
+          ))}
+        </select>
+
+        <input type="time" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} />
+        <input type="time" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} />
 
         <button className="action-button" onClick={handleAdd}>
           <FaPlus /> Add to Schedule
         </button>
+      </div>
+
+      <div className="add-room-box">
+        <h4>Add New Room</h4>
+        <input
+          type="text"
+          value={newRoom}
+          placeholder="Room Name/Number"
+          onChange={(e) => setNewRoom(e.target.value)}
+        />
+        <button onClick={handleAddRoom}>Add Room</button>
       </div>
 
       <div className="data-table-container">
@@ -94,8 +192,12 @@ function ManageSchedule() {
                 <tr>
                   <th>Course</th>
                   <th>Doctor</th>
+                  <th>Department</th>
+                  <th>Room</th>
                   <th>From</th>
                   <th>To</th>
+                  <th>Faculty</th>
+                  <th>Year</th>
                 </tr>
               </thead>
               <tbody>
@@ -103,8 +205,12 @@ function ManageSchedule() {
                   <tr key={i}>
                     <td>{s.course}</td>
                     <td>{s.doctor}</td>
+                    <td>{s.department}</td>
+                    <td>{s.room}</td>
                     <td>{s.from}</td>
                     <td>{s.to}</td>
+                    <td>{s.faculty}</td>
+                    <td>{s.year}</td>
                   </tr>
                 ))}
               </tbody>

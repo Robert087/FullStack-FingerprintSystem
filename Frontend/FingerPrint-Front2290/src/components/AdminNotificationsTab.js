@@ -7,6 +7,7 @@ function AdminNotificationTab() {
     title: "",
     message: "",
     year: "",
+    department: "",
   });
 
   useEffect(() => {
@@ -19,7 +20,7 @@ function AdminNotificationTab() {
   }, [notifications]);
 
   const handleSend = () => {
-    if (!form.title.trim() || !form.message.trim() || !form.year) {
+    if (!form.title.trim() || !form.message.trim() || !form.year || !form.department) {
       alert("Please fill all fields.");
       return;
     }
@@ -32,68 +33,80 @@ function AdminNotificationTab() {
     };
 
     setNotifications([newNotification, ...notifications]);
-    setForm({ title: "", message: "", year: "" });
+    setForm({ title: "", message: "", year: "", department: "" });
   };
 
   return (
-<div className="dashboard-card">
-  <div className="card-header">
-    <h3>Send Notification to Students</h3>
-    <p className="subtitle">Send announcements to students based on academic year</p>
-  </div>
+    <div className="dashboard-card">
+      <div className="card-header">
+        <h3>Send Notification to Students</h3>
+        <p className="subtitle">Send announcements to students based on academic year and department</p>
+      </div>
 
-  <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-    <div className="form-group">
-      <label>Title</label>
-      <input
-        type="text"
-        placeholder="Enter notification title"
-        value={form.title}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
-      />
+      <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+        <div className="form-group">
+          <label>Title</label>
+          <input
+            type="text"
+            placeholder="Enter notification title"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+          />
+        </div>
+        <div className="form-group">
+          <label>Department</label>
+          <select
+            value={form.department}
+            onChange={(e) => setForm({ ...form, department: e.target.value })}
+          >
+            <option value="" disabled hidden>Select Department</option>
+            <option value="CS">Computer Science</option>
+            <option value="IS">Information Systems</option>
+            <option value="IT">Information Technology</option>
+            <option value="SE">Software Engineering</option>
+          </select>
+        </div>
+      </div>
+        <div className="form-group">
+          <label>Academic Year</label>
+          <select
+            value={form.year}
+            onChange={(e) => setForm({ ...form, year: e.target.value })}
+          >
+            <option value="" disabled hidden>Select Year</option>
+            <option value="1">1st Year</option>
+            <option value="2">2nd Year</option>
+            <option value="3">3rd Year</option>
+            <option value="4">4th Year</option>
+          </select>
+        </div>
+
+
+
+      <div className="form-group" style={{ marginTop: "20px" }}>
+        <label>Message</label>
+        <textarea
+          rows="4"
+          placeholder="Write your message"
+          value={form.message}
+          onChange={(e) => setForm({ ...form, message: e.target.value })}
+        />
+      </div>
+
+      <button className="action-button" onClick={handleSend}>
+        Send Notification
+      </button>
+
+      <h3 style={{ marginTop: "30px" }}>Sent Notifications</h3>
+      <ul className="notification-list">
+        {notifications.map((n) => (
+          <li key={n.id}>
+            <strong>{n.title}</strong> ({n.year}st Year, {n.department})<br />
+            <span>{n.message}</span>
+          </li>
+        ))}
+      </ul>
     </div>
-
-    <div className="form-group">
-      <label>Academic Year</label>
-      <select
-        value={form.year}
-        onChange={(e) => setForm({ ...form, year: e.target.value })}
-      >
-        <option value="" disabled hidden>Select Year</option>
-        <option value="1">1st Year</option>
-        <option value="2">2nd Year</option>
-        <option value="3">3rd Year</option>
-        <option value="4">4th Year</option>
-      </select>
-    </div>
-  </div>
-
-  <div className="form-group" style={{ marginTop: "20px" }}>
-    <label>Message</label>
-    <textarea
-      rows="4"
-      placeholder="Write your message"
-      value={form.message}
-      onChange={(e) => setForm({ ...form, message: e.target.value })}
-    />
-  </div>
-
-  <button className="action-button" onClick={handleSend}>
-    Send Notification
-  </button>
-
-  <h3 style={{ marginTop: "30px" }}>Sent Notifications</h3>
-  <ul className="notification-list">
-    {notifications.map((n) => (
-      <li key={n.id}>
-        <strong>{n.title}</strong> ({n.year}st Year)<br />
-        <span>{n.message}</span>
-      </li>
-    ))}
-  </ul>
-</div>
-
-
   );
 }
 
