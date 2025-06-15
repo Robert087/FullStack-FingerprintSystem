@@ -35,7 +35,6 @@ import { useLanguage } from "./contexts/LanguageContext"
 import EditProfileModal from "./components/EditProfileModal"
 import ChangePasswordModal from "./components/ChangePasswordModal"
 
-
 function StudentDashboard() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -43,17 +42,29 @@ function StudentDashboard() {
   const [darkMode, setDarkMode] = useState(false)
   const [language, setLanguage] = useState(() => {
     return localStorage.getItem("language") || "english"
-    
   })
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const profileDropdownRef = useRef(null)
   const { t, isRTL, toggleLanguage } = useLanguage()
 
-  // Student data states
-  const [student, setStudent] = useState({})
+  // Student data states with proper initialization
+  const [student, setStudent] = useState({
+    displayName: "",
+    email: "",
+    department: "",
+    year: "",
+    id: "",
+    phone: "",
+    gpa: "",
+    fingerprintRegistered: false,
+  })
   const [TimeTable, setTimeTable] = useState([])
-  const [attendanceSummary, setAttendanceSummary] = useState({})
+  const [attendanceSummary, setAttendanceSummary] = useState({
+    percentage: 0,
+    attended: 0,
+    total: 0,
+  })
   const [fingerprintLogs, setFingerprintLogs] = useState([])
   const [fingerprintTodayScanned, setFingerprintTodayScanned] = useState(false)
   const [courses, setCourses] = useState([])
@@ -67,33 +78,124 @@ function StudentDashboard() {
     { message: "Campus closed for holiday.", date: "2025-03-28", isRead: true },
   ])
   const [isFingerprintScanning, setIsFingerprintScanning] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   const [logResultFilter, setLogResultFilter] = useState("all")
   const [logLocationFilter, setLogLocationFilter] = useState("all")
   const [courseFilter, setCourseFilter] = useState("all")
 
+  // Modal states
+  const [showEditProfile, setShowEditProfile] = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [userProfile, setUserProfile] = useState({
+    name: "",
+    email: "",
+  })
+  const [passwordInputs, setPasswordInputs] = useState({
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
+
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true)
+      setError(null)
+
       try {
-        const profile = await fetchStudentProfile()
-        const table = await fetchTimeTable()
-        const summary = await fetchAttendanceSummary()
-        const logs = await fetchFingerprintLogs()
-        const courseList = await fetchCourseAttendance()
+        // Get user data from localStorage or API
+        const userData = JSON.parse(localStorage.getItem("userData") || "{}")
 
-        setStudent(profile)
-        setTimeTable(table)
-        setAttendanceSummary(summary)
-        setFingerprintLogs(logs)
-        setCourses(courseList)
+        if (userData && userData.displayName) {
+          setStudent({
+            displayName: userData.displayName || "Student",
+            email: userData.email || "",
+            department: userData.department || "Computer Science",
+            year: userData.year || "3rd",
+            id: userData.id || "N/A",
+            phone: userData.phoneNumber || "",
+            gpa: userData.gpa || "3.5",
+            fingerprintRegistered: userData.fingerprintRegistered || false,
+          })
+        } else {
+          // Fallback: try to fetch from API
+          try {
+            const profile = await fetchStudentProfile()
+            if (profile) {
+              setStudent({
+                displayName: profile.displayName || "Student",
+                email: profile.email || "",
+                department: profile.department || "Computer Science",
+                year: profile.year || "3rd",
+                id: profile.id || "N/A",
+                phone: profile.phoneNumber || profile.phone || "",
+                gpa: profile.gpa || "3.5",
+                fingerprintRegistered: profile.fingerprintRegistered || false,
+              })
+            }
+          } catch (apiError) {
+            console.warn("Failed to fetch profile from API, using defaults")
+            setStudent({
+              displayName: "Student",
+              email: "",
+              department: "Computer Science",
+              year: "3rd",
+              id: "N/A",
+              phone: "",
+              gpa: "3.5",
+              fingerprintRegistered: false,
+            })
+          }
+        }
 
-        const today = new Date().toISOString().slice(0, 10)
-        const scannedToday = logs.some((log) => log.date === today && log.result === "Success")
-        setFingerprintTodayScanned(scannedToday)
+        // Load other data
+        try {
+          const table = await fetchTimeTable()
+          setTimeTable(Array.isArray(table) ? table : [])
+        } catch (err) {
+          console.warn("Failed to fetch timetable:", err)
+          setTimeTable([])
+        }
+
+        try {
+          const summary = await fetchAttendanceSummary()
+          setAttendanceSummary({
+            percentage: summary?.percentage || 0,
+            attended: summary?.attended || 0,
+            total: summary?.total || 0,
+          })
+        } catch (err) {
+          console.warn("Failed to fetch attendance summary:", err)
+        }
+
+        try {
+          const logs = await fetchFingerprintLogs()
+          setFingerprintLogs(Array.isArray(logs) ? logs : [])
+
+          const today = new Date().toISOString().slice(0, 10)
+          const scannedToday = Array.isArray(logs) && logs.some((log) => log.date === today && log.result === "Success")
+          setFingerprintTodayScanned(scannedToday)
+        } catch (err) {
+          console.warn("Failed to fetch fingerprint logs:", err)
+          setFingerprintLogs([])
+        }
+
+        try {
+          const courseList = await fetchCourseAttendance()
+          setCourses(Array.isArray(courseList) ? courseList : [])
+        } catch (err) {
+          console.warn("Failed to fetch courses:", err)
+          setCourses([])
+        }
       } catch (error) {
         console.error("Error loading student data:", error)
+        setError("Failed to load student data")
+      } finally {
+        setIsLoading(false)
       }
     }
+
     loadData()
 
     // Close dropdown when clicking outside
@@ -109,37 +211,26 @@ function StudentDashboard() {
     }
   }, [])
 
-
-const handleEditProfile = () => {
-  setUserProfile({
-    name: student.displayName || "",
-    email: student.email || ""
-  });
-  setShowEditProfile(true);
-  setProfileDropdownOpen(false);
-};
+  const handleEditProfile = () => {
+    setUserProfile({
+      name: student?.displayName || "",
+      email: student?.email || "",
+    })
+    setShowEditProfile(true)
+    setProfileDropdownOpen(false)
+  }
 
   const handleChangePassword = () => {
     setShowChangePassword(true)
     setProfileDropdownOpen(false)
   }
-const [showEditProfile, setShowEditProfile] = useState(false);
-const [showChangePassword, setShowChangePassword] = useState(false);
-const [userProfile, setUserProfile] = useState({
-
-});
-const [passwordInputs, setPasswordInputs] = useState({
-  oldPassword: "",
-  newPassword: "",
-  confirmPassword: ""
-});
 
   const handleGenerateReport = () => {
     // Generate attendance report
     const reportData = {
-      student: student.displayName,
+      student: student?.displayName || "Student",
       totalCourses: courses.length,
-      attendanceRate: attendanceSummary.percentage,
+      attendanceRate: attendanceSummary?.percentage || 0,
       date: new Date().toLocaleDateString(),
     }
 
@@ -161,6 +252,7 @@ const [passwordInputs, setPasswordInputs] = useState({
 
   const handleLogout = () => {
     if (window.confirm(t("Are you sure you want to logout?"))) {
+      localStorage.removeItem("userData")
       navigate("/")
     }
   }
@@ -211,27 +303,28 @@ const [passwordInputs, setPasswordInputs] = useState({
 
   // Filter logs based on search query and filters
   const filteredLogs = fingerprintLogs.filter((log) => {
-    const matchesSearch = searchQuery === "" || 
-      log.date.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch =
+      searchQuery === "" ||
+      log.date?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      log.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      log.result.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesResult = logResultFilter === "all" || 
-      log.result.toLowerCase() === logResultFilter.toLowerCase()
-    
-    const matchesLocation = logLocationFilter === "all" || 
-      log.location.toLowerCase().includes(logLocationFilter.toLowerCase())
-    
+      log.result?.toLowerCase().includes(searchQuery.toLowerCase())
+
+    const matchesResult = logResultFilter === "all" || log.result?.toLowerCase() === logResultFilter.toLowerCase()
+
+    const matchesLocation =
+      logLocationFilter === "all" || log.location?.toLowerCase().includes(logLocationFilter.toLowerCase())
+
     return matchesSearch && matchesResult && matchesLocation
   })
 
   const filteredCourses = courses.filter((course) => {
-    const matchesSearch = searchQuery === "" ||
+    const matchesSearch =
+      searchQuery === "" ||
       course.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.courseCode?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.instructor?.toLowerCase().includes(searchQuery.toLowerCase())
-    
+
     let matchesFilter = true
     if (courseFilter === "low") {
       const logsForCourse = fingerprintLogs.filter((log) => log.courseCode === course.courseCode)
@@ -246,9 +339,29 @@ const [passwordInputs, setPasswordInputs] = useState({
       const attendancePercent = Math.round((successLogs / totalSessions) * 100)
       matchesFilter = attendancePercent >= 75
     }
-    
+
     return matchesSearch && matchesFilter
   })
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading student dashboard...</p>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="error-container">
+        <p>Error: {error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    )
+  }
 
   return (
     <div className={`layout ${darkMode ? "dark-mode" : ""} ${isRTL ? "rtl" : "ltr"}`}>
@@ -304,52 +417,51 @@ const [passwordInputs, setPasswordInputs] = useState({
           <div className="header-right" ref={profileDropdownRef}>
             <div className="profile-dropdown" onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}>
               <div className="profile-info">
-                <div className="profile-avatar">{student.displayName?.charAt(0) || "S"}</div>
-                <span className="profile-name">{student.displayName}</span>
+                <div className="profile-avatar">{(student?.displayName || "S").charAt(0)}</div>
+                <span className="profile-name">{student?.displayName || "Student"}</span>
                 <FaChevronDown className="dropdown-icon" />
               </div>
 
-{profileDropdownOpen && (
-  <div className="dropdown-menu">
-    <div className="dropdown-header">
-      <div className="dropdown-avatar">
-        {student.displayName?.charAt(0) || "S"}
-      </div>
-      <div className="dropdown-user-info">
-        <h4>{student.displayName}</h4>
-        <p>{student.email}</p>
-      </div>
-    </div>
+              {profileDropdownOpen && (
+                <div className="dropdown-menu">
+                  <div className="dropdown-header">
+                    <div className="dropdown-avatar">{(student?.displayName || "S").charAt(0)}</div>
+                    <div className="dropdown-user-info">
+                      <h4>{student?.displayName || "Student"}</h4>
+                      <p>{student?.email || "No email"}</p>
+                    </div>
+                  </div>
 
-    <div className="dropdown-divider"></div>
+                  <div className="dropdown-divider"></div>
 
-    <div className="dropdown-item" onClick={handleEditProfile}>
-      <FaEdit className="dropdown-item-icon" />
-      <span>{t("Edit Profile")}</span>
-    </div>
+                  <div className="dropdown-item" onClick={handleEditProfile}>
+                    <FaEdit className="dropdown-item-icon" />
+                    <span>{t("Edit Profile")}</span>
+                  </div>
 
-<div className="dropdown-item" onClick={handleChangePassword}>
-  <FaKey className="dropdown-item-icon" />
-  <span>{t("Change Password")}</span>
-</div>
+                  <div className="dropdown-item" onClick={handleChangePassword}>
+                    <FaKey className="dropdown-item-icon" />
+                    <span>{t("Change Password")}</span>
+                  </div>
 
-    <div className="dropdown-item" onClick={handleLanguageToggle}>
-      <FaGlobe className="dropdown-item-icon" />
-      <span>{language === "english" ? "العربية" : "English"}</span>
-    </div>
+                  <div className="dropdown-item" onClick={handleLanguageToggle}>
+                    <FaGlobe className="dropdown-item-icon" />
+                    <span>{language === "english" ? "العربية" : "English"}</span>
+                  </div>
 
-    <div className="dropdown-divider"></div>
+                  <div className="dropdown-divider"></div>
 
-    <div className="dropdown-item logout" onClick={handleLogout}>
-      <FaSignOutAlt className="dropdown-item-icon" />
-      <span>{t("Logout")}</span>
+                  <div className="dropdown-item logout" onClick={handleLogout}>
+                    <FaSignOutAlt className="dropdown-item-icon" />
+                    <span>{t("Logout")}</span>
                   </div>
                 </div>
               )}
             </div>
           </div>
         </header>
-     <div className="content-wrapper">
+
+        <div className="content-wrapper">
           <div className="breadcrumb">
             <span className="breadcrumb-item">{t("Home")}</span>
             <span className="breadcrumb-separator">/</span>
@@ -366,55 +478,61 @@ const [passwordInputs, setPasswordInputs] = useState({
                 transition={{ duration: 0.4 }}
                 className="tab-content"
               >
+                {showEditProfile && (
+                  <EditProfileModal
+                    userProfile={userProfile}
+                    setUserProfile={setUserProfile}
+                    onClose={() => setShowEditProfile(false)}
+                  />
+                )}
 
-{showEditProfile && (
-  <EditProfileModal
-    userProfile={userProfile}
-    setUserProfile={setUserProfile}
-    onClose={() => setShowEditProfile(false)}
-  />
-)}
-
-
-{showChangePassword && (
-  <ChangePasswordModal
-    inputs={passwordInputs}
-    setInputs={setPasswordInputs}
-    onClose={() => setShowChangePassword(false)}
-    onSuccess={() => {
-      alert("Password updated successfully.");
-      setShowChangePassword(false);
-    }}
-  />
-)}
-
+                {showChangePassword && (
+                  <ChangePasswordModal
+                    inputs={passwordInputs}
+                    setInputs={setPasswordInputs}
+                    onClose={() => setShowChangePassword(false)}
+                    onSuccess={() => {
+                      alert("Password updated successfully.")
+                      setShowChangePassword(false)
+                    }}
+                  />
+                )}
 
                 {activeTab === "dashboard" && (
                   <div className="dashboard-layout">
                     <div className="dashboard-header">
                       <h1>
-                        {t("Welcome back")}, {student.displayName}
+                        {t("Welcome back")}, {student?.displayName || "Student"}
                       </h1>
                       <p className="subtitle">{t("Here's what's happening with your academic progress")}</p>
                     </div>
 
                     <div className="dashboard-stats">
-                      <div className="stat-card" onClick={() => setActiveTab("courseAttendance")} style={{ cursor: 'pointer' }}>
+                      <div
+                        className="stat-card"
+                        onClick={() => setActiveTab("courseAttendance")}
+                        style={{ cursor: "pointer" }}
+                      >
                         <div className="stat-icon attendance">
                           <FaChartBar />
                         </div>
                         <div className="stat-info">
                           <h3>{t("Attendance Rate")}</h3>
-                          <div className="stat-value">{attendanceSummary.percentage?.toFixed(1)}%</div>
+                          <div className="stat-value">{(attendanceSummary?.percentage || 0).toFixed(1)}%</div>
                           <div className="stat-detail">
                             <span>
-                              {attendanceSummary.attended} {t("of")} {attendanceSummary.total} {t("lectures")}
+                              {attendanceSummary?.attended || 0} {t("of")} {attendanceSummary?.total || 0}{" "}
+                              {t("lectures")}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="stat-card" onClick={() => setActiveTab("courseAttendance")} style={{ cursor: 'pointer' }}>
+                      <div
+                        className="stat-card"
+                        onClick={() => setActiveTab("courseAttendance")}
+                        style={{ cursor: "pointer" }}
+                      >
                         <div className="stat-icon courses">
                           <FaBook />
                         </div>
@@ -438,9 +556,11 @@ const [passwordInputs, setPasswordInputs] = useState({
                         </div>
                       </div>
 
-    
-
-                      <div className="stat-card" onClick={() => setActiveTab("fingerprintLog")} style={{ cursor: 'pointer' }}>
+                      <div
+                        className="stat-card"
+                        onClick={() => setActiveTab("fingerprintLog")}
+                        style={{ cursor: "pointer" }}
+                      >
                         <div className="stat-icon fingerprint">
                           <FaFingerprint />
                         </div>
@@ -485,11 +605,11 @@ const [passwordInputs, setPasswordInputs] = useState({
 
                               return todaySessions.map((session, index) => (
                                 <div key={index} className="schedule-item">
-                                  <div className="schedule-time">{session.time.split(" - ")[0]}</div>
+                                  <div className="schedule-time">{session.time?.split(" - ")[0] || "TBD"}</div>
                                   <div className="schedule-details">
-                                    <h4>{session.course}</h4>
+                                    <h4>{session.course || "Course"}</h4>
                                     <p>
-                                      {session.location} • {session.instructor}
+                                      {session.location || "TBD"} • {session.instructor || "TBD"}
                                     </p>
                                   </div>
                                 </div>
@@ -527,11 +647,11 @@ const [passwordInputs, setPasswordInputs] = useState({
                 {activeTab === "profile" && (
                   <div className="profile-layout">
                     <div className="profile-header">
-                      <div className="profile-avatar-large">{student.displayName?.charAt(0) || "S"}</div>
+                      <div className="profile-avatar-large">{(student?.displayName || "S").charAt(0)}</div>
                       <div className="profile-header-info">
-                        <h1>{student.displayName}</h1>
+                        <h1>{student?.displayName || "Student"}</h1>
                         <p>
-                          {student.department} • {student.year} {t("Year")}
+                          {student?.department || "Department"} • {student?.year || "Year"} {t("Year")}
                         </p>
                       </div>
                     </div>
@@ -542,19 +662,19 @@ const [passwordInputs, setPasswordInputs] = useState({
                         <div className="profile-info-grid">
                           <div className="profile-info-item">
                             <label>{t("Full Name")}</label>
-                            <p>{student.displayName}</p>
+                            <p>{student?.displayName || "Not provided"}</p>
                           </div>
                           <div className="profile-info-item">
                             <label>{t("Email Address")}</label>
-                            <p>{student.email}</p>
+                            <p>{student?.email || "Not provided"}</p>
                           </div>
                           <div className="profile-info-item">
                             <label>{t("Student ID")}</label>
-                            <p>{student.id || "N/A"}</p>
+                            <p>{student?.id || "N/A"}</p>
                           </div>
                           <div className="profile-info-item">
                             <label>{t("Phone Number")}</label>
-                            <p>{student.phone || t("Not provided")}</p>
+                            <p>{student?.phone || t("Not provided")}</p>
                           </div>
                         </div>
                       </div>
@@ -564,15 +684,15 @@ const [passwordInputs, setPasswordInputs] = useState({
                         <div className="profile-info-grid">
                           <div className="profile-info-item">
                             <label>{t("Department")}</label>
-                            <p>{student.department}</p>
+                            <p>{student?.department || "Not specified"}</p>
                           </div>
                           <div className="profile-info-item">
                             <label>{t("Academic Year")}</label>
-                            <p>{student.year}</p>
+                            <p>{student?.year || "Not specified"}</p>
                           </div>
                           <div className="profile-info-item">
                             <label>{t("GPA")}</label>
-                            <p>{student.gpa}</p>
+                            <p>{student?.gpa || "N/A"}</p>
                           </div>
                         </div>
                       </div>
@@ -580,7 +700,7 @@ const [passwordInputs, setPasswordInputs] = useState({
                       <div className="profile-section">
                         <h3>{t("Fingerprint Status")}</h3>
                         <div className="fingerprint-status">
-                          {student.fingerprintRegistered ? (
+                          {student?.fingerprintRegistered ? (
                             <div className="fingerprint-registered">
                               <FaFingerprint className="fingerprint-icon" />
                               <div>
@@ -619,13 +739,21 @@ const [passwordInputs, setPasswordInputs] = useState({
 
                     <div className="data-filters">
                       <div className="filter-group">
-                        <select className="filter-select" value={logResultFilter} onChange={(e) => setLogResultFilter(e.target.value)}>
+                        <select
+                          className="filter-select"
+                          value={logResultFilter}
+                          onChange={(e) => setLogResultFilter(e.target.value)}
+                        >
                           <option value="all">{t("All Results")}</option>
                           <option value="success">{t("Success")}</option>
                           <option value="failed">{t("Failed")}</option>
                         </select>
 
-                        <select className="filter-select" value={logLocationFilter} onChange={(e) => setLogLocationFilter(e.target.value)}>
+                        <select
+                          className="filter-select"
+                          value={logLocationFilter}
+                          onChange={(e) => setLogLocationFilter(e.target.value)}
+                        >
                           <option value="all">{t("All Locations")}</option>
                           <option value="main">{t("Main Campus")}</option>
                           <option value="lab">{t("Lab Building")}</option>
@@ -671,14 +799,14 @@ const [passwordInputs, setPasswordInputs] = useState({
                                 ) || {}
                               return (
                                 <tr key={index}>
-                                  <td>{log.date}</td>
-                                  <td>{log.time}</td>
-                                  <td>{log.location}</td>
+                                  <td>{log.date || "N/A"}</td>
+                                  <td>{log.time || "N/A"}</td>
+                                  <td>{log.location || "N/A"}</td>
                                   <td>{matchedCourse.course || "N/A"}</td>
                                   <td>{log.courseCode || "N/A"}</td>
                                   <td>
                                     <span className={`status-badge ${log.result === "Success" ? "success" : "error"}`}>
-                                      {log.result}
+                                      {log.result || "Unknown"}
                                     </span>
                                   </td>
                                 </tr>
@@ -716,13 +844,14 @@ const [passwordInputs, setPasswordInputs] = useState({
                           const daySessions = TimeTable.filter((session) => session.day === activeDay)
                           daySessions.sort((a, b) => {
                             const parseTime = (time) => {
+                              if (!time) return 0
                               const [timeStr, modifier] = time.split(" ")
                               let [hours, minutes] = timeStr.split(":").map(Number)
                               if (modifier === "PM" && hours !== 12) hours += 12
                               if (modifier === "AM" && hours === 12) hours = 0
                               return hours * 60 + minutes
                             }
-                            return parseTime(a.time.split(" - ")[0]) - parseTime(b.time.split(" - ")[0])
+                            return parseTime(a.time?.split(" - ")[0]) - parseTime(b.time?.split(" - ")[0])
                           })
 
                           if (daySessions.length === 0) {
@@ -742,15 +871,15 @@ const [passwordInputs, setPasswordInputs] = useState({
                               {daySessions.map((session, index) => (
                                 <div key={index} className="timeline-item">
                                   <div className="timeline-time">
-                                    <span>{session.time.split(" - ")[0]}</span>
-                                    <span className="timeline-duration">{session.time.split(" - ")[1]}</span>
+                                    <span>{session.time?.split(" - ")[0] || "TBD"}</span>
+                                    <span className="timeline-duration">{session.time?.split(" - ")[1] || ""}</span>
                                   </div>
                                   <div className="timeline-content">
                                     <div className="timeline-card">
-                                      <h3>{session.course}</h3>
+                                      <h3>{session.course || "Course"}</h3>
                                       <div className="timeline-details">
                                         <span>
-                                          <strong>{t("Code")}:</strong> {session.courseCode}
+                                          <strong>{t("Code")}:</strong> {session.courseCode || "N/A"}
                                         </span>
                                         <span>
                                           <strong>{t("Instructor")}:</strong> {session.instructor || "TBD"}
@@ -826,7 +955,11 @@ const [passwordInputs, setPasswordInputs] = useState({
 
                     <div className="data-filters">
                       <div className="filter-group">
-                        <select className="filter-select" value={courseFilter} onChange={(e) => setCourseFilter(e.target.value)}>
+                        <select
+                          className="filter-select"
+                          value={courseFilter}
+                          onChange={(e) => setCourseFilter(e.target.value)}
+                        >
                           <option value="all">{t("All Courses")}</option>
                           <option value="low">{t("Low Attendance")}</option>
                           <option value="good">{t("Good Attendance")}</option>
@@ -855,7 +988,7 @@ const [passwordInputs, setPasswordInputs] = useState({
                             return (
                               <div key={index} className={`course-card ${status}`}>
                                 <div className="course-header">
-                                  <h3>{course.name}</h3>
+                                  <h3>{course.name || "Course"}</h3>
                                   <span className={`course-status ${status}`}>
                                     {status === "good" ? t("Good Standing") : t("Low Attendance")}
                                   </span>
@@ -865,7 +998,7 @@ const [passwordInputs, setPasswordInputs] = useState({
                                   <div className="course-info">
                                     <div className="course-info-item">
                                       <label>{t("Course Code")}</label>
-                                      <p>{course.courseCode}</p>
+                                      <p>{course.courseCode || "N/A"}</p>
                                     </div>
                                     <div className="course-info-item">
                                       <label>{t("Instructor")}</label>
@@ -873,7 +1006,7 @@ const [passwordInputs, setPasswordInputs] = useState({
                                     </div>
                                     <div className="course-info-item">
                                       <label>{t("Credit Hours")}</label>
-                                      <p>{course.credit}</p>
+                                      <p>{course.credit || "N/A"}</p>
                                     </div>
                                   </div>
 
@@ -932,13 +1065,12 @@ const [passwordInputs, setPasswordInputs] = useState({
                               <h4>{t("Profile Information")}</h4>
                               <p>{t("Update your personal information")}</p>
                             </div>
-<button
-  className={`settings-btn ${isRTL ? "align-start-rtl" : ""}`}
-  onClick={() => setShowEditProfile(true)}
->
-  {t("Edit")}
-</button>
-
+                            <button
+                              className={`settings-btn ${isRTL ? "align-start-rtl" : ""}`}
+                              onClick={() => setShowEditProfile(true)}
+                            >
+                              {t("Edit")}
+                            </button>
                           </div>
 
                           <div className="settings-item">
@@ -946,11 +1078,10 @@ const [passwordInputs, setPasswordInputs] = useState({
                               <h4>{t("Change Password")}</h4>
                               <p>{t("Update your password regularly for security")}</p>
                             </div>
-                          <button className="settings-btn" onClick={() => setShowChangePassword(true)}>    {t("Change")}
-  {t.change}
-</button>
-
-                          </div>             
+                            <button className="settings-btn" onClick={() => setShowChangePassword(true)}>
+                              {t("Change")}
+                            </button>
+                          </div>
                         </div>
                       </div>
 
