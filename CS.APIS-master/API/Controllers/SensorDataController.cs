@@ -28,10 +28,11 @@ namespace API.Controllers
             };
             _storeContext.SensorData.Add(mappData);
             await _storeContext.SaveChangesAsync();
-            var Data = _storeContext.SensorData.Where(x=>x.Name == SensorData.Name);
+            var Data = _storeContext.SensorData.Where(x => x.Name == SensorData.Name);
             return Ok(Data);
 
         }
+
         [HttpGet]
         public async Task<ActionResult<SensorDataDTO>> GetData(int id)
         {  

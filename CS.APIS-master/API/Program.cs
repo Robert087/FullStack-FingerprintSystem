@@ -21,49 +21,41 @@ namespace API
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            builder.WebHost.UseUrls("http://0.0.0.0:7069");
+
             // Add services to the container.
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            // Add DbContexts
             builder.Services.AddDbContext<StoreContext>(options =>
-            {
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-            });
+                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             builder.Services.AddDbContext<AppIdentityDbContext>(options =>
-            {
-                options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityConnection"));
-            });
+                options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityConnection")));
 
-            // Add application services and identity
             builder.Services.AddApplicationServices();
 
-            builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
-            {
-                // You can add identity options here if needed
-            }).AddEntityFrameworkStores<AppIdentityDbContext>();
+            builder.Services.AddIdentity<AppUser, IdentityRole>()
+                .AddEntityFrameworkStores<AppIdentityDbContext>();
 
-            // Add JWT authentication
-            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-            {
-                options.TokenValidationParameters = new TokenValidationParameters()
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
                 {
-                    ValidateIssuer = true,
-                    ValidIssuer = builder.Configuration["JWT:ValidIssure"],
-                    ValidateAudience = true,
-                    ValidAudience = builder.Configuration["JWT:ValidAudience"],
-                    ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero,
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(builder.Configuration["JWT:Authkey"] ?? string.Empty)
-                    )
-                };
-            });
+                    options.TokenValidationParameters = new TokenValidationParameters()
+                    {
+                        ValidateIssuer = true,
+                        ValidIssuer = builder.Configuration["JWT:ValidIssure"],
+                        ValidateAudience = true,
+                        ValidAudience = builder.Configuration["JWT:ValidAudience"],
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.Zero,
+                        ValidateIssuerSigningKey = true,
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(builder.Configuration["JWT:Authkey"] ?? string.Empty))
+                    };
+                });
 
-            // ✅ Add CORS policy
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll", policy =>
@@ -76,9 +68,8 @@ namespace API
 
             var app = builder.Build();
 
-            // Update database at runtime
-            using var scop = app.Services.CreateScope();
-            var services = scop.ServiceProvider;
+            using var scope = app.Services.CreateScope();
+            var services = scope.ServiceProvider;
             var dbContext = services.GetRequiredService<StoreContext>();
             var identityDbContext = services.GetRequiredService<AppIdentityDbContext>();
             var userManager = services.GetRequiredService<UserManager<AppUser>>();
@@ -96,36 +87,23 @@ namespace API
                 logger.LogError(ex, "An error occurred during migration");
             }
 
-            // Use custom exception middleware
             app.UseMiddleware<ExcptionMiddleWare>();
 
-            // Enable Swagger in development
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
 
-            // Global error page redirection
             app.UseStatusCodePagesWithReExecute("/Errors/{0}");
 
-            // HTTPS redirect
-            app.UseHttpsRedirection();
-
-            // ✅ Enable CORS
+           
             app.UseCors("AllowAll");
-
-            // Authentication & Authorization
-            app.UseAuthentication(); // Needed for JWT
+            app.UseAuthentication();
             app.UseAuthorization();
-
-            // Serve static files
             app.UseStaticFiles();
-
-            // Map endpoints
             app.MapControllers();
 
-            // Run the application
             app.Run();
         }
     }

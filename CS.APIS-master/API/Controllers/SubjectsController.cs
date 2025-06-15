@@ -2,12 +2,13 @@
 using AutoMapper;
 using Core;
 using Core.Entities;
-using Core.Repositories.Contract; 
+using Core.Repositories.Contract;
 using Core.Specifications.SubjectsSpecifications;
 using Core.Specifications.SubjectsSpecParamsSpecifications;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Project.APIS.Erorrs;
+using Repository.Data;
 
 namespace API.Controllers
 {
@@ -15,11 +16,13 @@ namespace API.Controllers
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
+        private readonly StoreContext context;
 
-        public SubjectsController(IUnitOfWork unitOfWork,IMapper mapper)
+        public SubjectsController(IUnitOfWork unitOfWork, IMapper mapper, StoreContext context)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
+            this.context = context;
         }
         //[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]  
         [HttpGet("GetAllSubjects")]   //Subjects
@@ -86,14 +89,29 @@ namespace API.Controllers
             var Subject = await _unitOfWork.Repository<Subjects>().GetById(id);
             if (Subject is not null)
             {
-                _unitOfWork.Repository<Subjects>().Delete(Subject); 
-                await _unitOfWork.CompleteAsync(); 
+                _unitOfWork.Repository<Subjects>().Delete(Subject);
+                await _unitOfWork.CompleteAsync();
             }
             else
             {
                 NotFound(new ApiResponse(404));// 404
-            } 
+            }
 
-        } 
-	}
+        }
+        [HttpGet("GetSubjectsCount")]
+
+        public async Task<ActionResult<int>> GetSubjectCount()
+        {
+            try
+            {
+                // استخدم الـ context مباشرة لحساب العدد
+                var Subject = context.Subjects.Count();
+                return Ok(Subject); // 200 OK مع العدد
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new ApiResponse(500, $"An error occurred while retrieving student count: {ex.Message}"));
+            }
+        }
+    }
 }
