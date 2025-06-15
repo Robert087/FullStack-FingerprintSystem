@@ -42,6 +42,19 @@ function LoginForm() {
     setError("")
     setLoading(true)
 
+  //   Static Admin Login
+    if (email === "admin@example.com" && password === "admin123") {
+      const staticAdmin = {
+        userType: "Admin",
+        email,
+        name: "Admin User"
+      }
+      localStorage.setItem("user", JSON.stringify(staticAdmin))
+      navigate("/admin-dashboard")
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await fetch("http://192.168.68.112:7069/api/account/login", {
         method: "POST",
