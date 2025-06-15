@@ -26,7 +26,7 @@ function StudentManagement() {
   const [filterFaculty, setFilterFaculty] = useState("");
   const [filterYear, setFilterYear] = useState("");
 
-  const BASE_URL = 'https://192.168.1.6:7069';
+  const BASE_URL = 'http://192.168.68.112:7069';
 
   const fetchData = async () => {
     try {

@@ -1,74 +1,166 @@
+// ✅ CourseManagement.js - نسخة محدثة
+
 "use client"
 
 import { useState, useEffect } from "react"
-import { FaPlus } from "react-icons/fa"
+import { FaPlus, FaTrash, FaEdit } from "react-icons/fa"
 import "../dashboard.css"
 import { useLanguage } from "../contexts/LanguageContext"
 import { showSuccess, showError } from "../utils/toast"
+import config from "../config"
 
 function CourseManagement() {
-  const [courses, setCourses] = useState([])
+  const [courses, setCoursesData] = useState([])
   const [form, setForm] = useState({
+    id: 0,
     name: "",
     code: "",
     creditHours: "",
-    semester: "",
-    year: "",
-    doctorEmail: "",
+    departmentId: "",
+    semesterId: "",
+    yearId: "",
+    doctorId: "",
   })
+  const [departments, setDepartments] = useState([])
+  const [facultyYears, setFacultyYears] = useState([])
+  const [semesters, setSemesters] = useState([])
+  const [filteredYears, setFilteredYears] = useState([])
+  const [filteredDoctors, setFilteredDoctors] = useState([])
+  const [filteredSemesters, setFilteredSemesters] = useState([])
   const [doctors, setDoctors] = useState([])
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [isLoading, setIsLoading] = useState(true)
+
   const { t } = useLanguage()
+  const BASE_URL = config.BASE_URL
 
   useEffect(() => {
-    const savedDoctors = JSON.parse(localStorage.getItem("doctors")) || []
-    setDoctors(savedDoctors)
+    const fetchInitialData = async () => {
+      try {
+        const [deptRes, yearsRes, semRes, docRes, subjectRes] = await Promise.all([
+          fetch(`${BASE_URL}/api/Faculty/GetAllFaculty`),
+          fetch(`${BASE_URL}/api/FacultyYear/GetAllFacultyYear`),
+          fetch(`${BASE_URL}/api/FacultyYearSemister/GetAllSemisters`),
+          fetch(`${BASE_URL}/api/Doctors/GetAllDoctors`),
+          fetch(`${BASE_URL}/api/Subjects/GetAllSubjects`)
+        ])
 
-    const savedCourses = JSON.parse(localStorage.getItem("courses")) || []
-    setCourses(savedCourses)
+        const [deptData, yearsData, semData, docData, subjectData] = await Promise.all([
+          deptRes.json(), yearsRes.json(), semRes.json(), docRes.json(), subjectRes.json()
+        ])
+
+        setDepartments(deptData)
+        setFacultyYears(yearsData)
+        setSemesters(semData)
+        setDoctors(docData)
+        setCoursesData(subjectData)
+      } catch {
+        showError("❌ Failed to load data")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchInitialData()
   }, [])
 
   useEffect(() => {
-    localStorage.setItem("courses", JSON.stringify(courses))
-  }, [courses])
+    if (form.departmentId) {
+      setFilteredYears(facultyYears.filter(y => y.facultyId === parseInt(form.departmentId)))
+      setFilteredDoctors(doctors.filter(d => d.facultyId === parseInt(form.departmentId)))
+    } else {
+      setFilteredYears([])
+      setFilteredDoctors([])
+    }
+    setForm(prev => ({ ...prev, yearId: "", semesterId: "", doctorId: "" }))
+  }, [form.departmentId, facultyYears, doctors])
+
+  useEffect(() => {
+    if (form.yearId) {
+      setFilteredSemesters(semesters.filter(s => s.facultyYearId === parseInt(form.yearId)))
+    } else {
+      setFilteredSemesters([])
+    }
+  }, [form.yearId, semesters])
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  const handleAdd = () => {
-    if (!form.name?.trim()) {
-      showError(t("Course name is required"))
-      return
-    }
-    if (!form.code?.trim()) {
-      showError(t("Course code is required"))
-      return
-    }
-    if (!form.year) {
-      showError(t("Year is required"))
-      return
-    }
-    if (!form.semester) {
-      showError(t("Semester is required"))
-      return
-    }
-
-    if (courses.some((course) => course.code.toLowerCase() === form.code.toLowerCase())) {
-      showError(t("Course code already exists"))
-      return
-    }
-
-    const newCourse = {
-      ...form,
-      id: Date.now(),
-      createdAt: new Date().toISOString(),
-      status: "Active",
-    }
-
-    setCourses([...courses, newCourse])
-    setForm({ name: "", code: "", creditHours: "", semester: "", year: "", doctorEmail: "" })
-    showSuccess(t("Course added successfully"))
+  const resetForm = () => {
+    setForm({ id: 0, name: "", code: "", creditHours: "", departmentId: "", yearId: "", semesterId: "", doctorId: "" })
+    setIsEditMode(false)
   }
+
+  const handleAddOrUpdate = async () => {
+    if (!form.name?.trim() || !form.code?.trim() || !form.departmentId || !form.yearId || !form.semesterId || !form.doctorId) {
+      return showError(t("Please fill all required fields"))
+    }
+
+    const duplicate = courses.find(c => c.sub_Name.toLowerCase() === form.name.toLowerCase() && c.id !== form.id)
+    if (duplicate) {
+      return showError(t("Course with same name already exists"))
+    }
+
+    const dto = {
+      id: form.id,
+      sub_Name: form.name,
+      dr_ID: parseInt(form.doctorId),
+      ins_ID: 0,
+      facYearSem_ID: parseInt(form.semesterId)
+    }
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/Subjects/Add_OR_UpdateSubject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dto)
+      })
+
+      if (!res.ok) throw new Error()
+
+      showSuccess(isEditMode ? t("Course updated successfully") : t("Course added successfully"))
+      resetForm()
+      const updatedCourses = await fetch(`${BASE_URL}/api/Subjects/GetAllSubjects`)
+      const updatedData = await updatedCourses.json()
+      setCoursesData(updatedData)
+    } catch {
+      showError("❌ Failed to save course")
+    }
+  }
+
+  const handleEdit = (course) => {
+    setForm({
+      id: course.id,
+      name: course.sub_Name,
+      code: "",
+      creditHours: "",
+      departmentId: course.doctors?.facultyId?.toString() || "",
+      yearId: course.facultyYearSemister?.facultyYear?.id?.toString() || "",
+      semesterId: course.facultyYearSemister?.id?.toString() || "",
+      doctorId: course.doctors?.id?.toString() || ""
+    })
+    setIsEditMode(true)
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this course?")) return
+    try {
+      await fetch(`${BASE_URL}/api/Subjects/DeleteSubject?id=${id}`, { method: 'DELETE' })
+      showSuccess("🗑️ Course deleted")
+      const updatedCourses = await fetch(`${BASE_URL}/api/Subjects/GetAllSubjects`)
+      const updatedData = await updatedCourses.json()
+      setCoursesData(updatedData)
+    } catch {
+      showError("❌ Failed to delete course")
+    }
+  }
+
+  const filteredCourses = courses.filter(c =>
+    c.sub_Name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.doctors?.dr_NameEn?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   return (
     <div className="section-layout">
@@ -77,69 +169,80 @@ function CourseManagement() {
         <p className="subtitle">{t("Add and assign courses to doctors")}</p>
       </div>
 
+      <div style={{ marginBottom: "10px" }}>
+        <input
+          placeholder="🔍 Search by name or doctor"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: "100%", padding: "8px", border: "1px solid #ccc", borderRadius: "8px" }}
+        />
+      </div>
+
       <div className="form-grid">
         <input name="name" placeholder={t("Course Name")} value={form.name} onChange={handleChange} />
         <input name="code" placeholder={t("Course Code")} value={form.code} onChange={handleChange} />
         <input name="creditHours" placeholder={t("Credit Hours")} value={form.creditHours} onChange={handleChange} />
 
-        <select name="year" value={form.year} onChange={handleChange}>
-          <option value="" disabled hidden>
-            {t("Select Year")}
-          </option>
-          <option value="1">{t("1st Year")}</option>
-          <option value="2">{t("2nd Year")}</option>
-          <option value="3">{t("3rd Year")}</option>
-          <option value="4">{t("4th Year")}</option>
-        </select>
-
-        <select name="semester" value={form.semester} onChange={handleChange}>
-          <option value="" disabled hidden>
-            {t("Select Semester")}
-          </option>
-          <option value="Semester 1">{t("Semester 1")}</option>
-          <option value="Semester 2">{t("Semester 2")}</option>
-        </select>
-
-        <select name="doctorEmail" value={form.doctorEmail} onChange={handleChange}>
-          <option value="" disabled hidden>
-            {t("Assign Doctor")}
-          </option>
-          {doctors.map((doc, index) => (
-            <option key={index} value={doc.email}>
-              {doc.name} - {doc.department}
-            </option>
+        <select name="departmentId" value={form.departmentId} onChange={handleChange}>
+          <option value="" disabled hidden>{t("Select Department")}</option>
+          {departments.map(d => (
+            <option key={d.id} value={d.id}>{d.fac_Name}</option>
           ))}
         </select>
 
-        <button className="action-button" onClick={handleAdd}>
-          <FaPlus /> {t("Add Course")}
+        <select name="yearId" value={form.yearId} onChange={handleChange}>
+          <option value="" disabled hidden>{t("Select Year")}</option>
+          {filteredYears.map(y => (
+            <option key={y.id} value={y.id}>{y.year}</option>
+          ))}
+        </select>
+
+        <select name="semesterId" value={form.semesterId} onChange={handleChange}>
+          <option value="" disabled hidden>{t("Select Semester")}</option>
+          {filteredSemesters.map(s => (
+            <option key={s.id} value={s.id}>{s.sem_Name}</option>
+          ))}
+        </select>
+
+        <select name="doctorId" value={form.doctorId} onChange={handleChange}>
+          <option value="" disabled hidden>{t("Assign Doctor")}</option>
+          {filteredDoctors.map(d => (
+            <option key={d.id} value={d.id}>{d.dr_NameEn} - {d.dr_Email}</option>
+          ))}
+        </select>
+
+        <button className="action-button" onClick={handleAddOrUpdate}>
+          <FaPlus /> {isEditMode ? t("Update Course") : t("Add Course")}
         </button>
       </div>
 
       <div className="data-table-container">
-        {courses.length === 0 ? (
-          <p className="no-data-message">{t("No courses added yet.")}</p>
+        {isLoading ? (
+          <p className="no-data-message">⏳ Loading courses...</p>
+        ) : filteredCourses.length === 0 ? (
+          <p className="no-data-message">{t("No courses found.")}</p>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
                 <th>{t("Name")}</th>
-                <th>{t("Code")}</th>
-                <th>{t("Credit Hours")}</th>
+                <th>{t("Doctor")}</th>
                 <th>{t("Year")}</th>
                 <th>{t("Semester")}</th>
-                <th>{t("Assigned Doctor")}</th>
+                <th>{t("Actions")}</th>
               </tr>
             </thead>
             <tbody>
-              {courses.map((course, index) => (
+              {filteredCourses.map((course, index) => (
                 <tr key={index}>
-                  <td>{course.name}</td>
-                  <td>{course.code}</td>
-                  <td>{course.creditHours}</td>
-                  <td>{course.year}</td>
-                  <td>{course.semester}</td>
-                  <td>{doctors.find((d) => d.email === course.doctorEmail)?.name || t("Not Assigned")}</td>
+                  <td>{course.sub_Name}</td>
+                  <td>{course.doctors?.dr_NameEn || t("Not Assigned")}</td>
+                  <td>{course.facultyYearSemister?.facultyYear?.year || "-"}</td>
+                  <td>{course.facultyYearSemister?.sem_Name || "-"}</td>
+                  <td>
+                    <button onClick={() => handleEdit(course)} className="edit-button"><FaEdit /></button>
+                    <button onClick={() => handleDelete(course.id)} className="delete-button"><FaTrash /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -150,4 +253,4 @@ function CourseManagement() {
   )
 }
 
-export default CourseManagement
+export default CourseManagement;
