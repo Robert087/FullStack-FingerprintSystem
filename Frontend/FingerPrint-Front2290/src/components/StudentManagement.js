@@ -3,6 +3,7 @@ import { FaEye, FaEyeSlash, FaTrash, FaEdit, FaKey } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './StudentManagement.css';
+import config from "../config"
 
 function StudentManagement() {
   
@@ -26,7 +27,7 @@ function StudentManagement() {
   const [filterFaculty, setFilterFaculty] = useState("");
   const [filterYear, setFilterYear] = useState("");
 
-  const BASE_URL = 'http://192.168.68.112:7069';
+  const BASE_URL = config.BASE_URL
 
   const fetchData = async () => {
     try {

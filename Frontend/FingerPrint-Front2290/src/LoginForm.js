@@ -7,6 +7,8 @@ import * as Components from "./Components"
 import { useLanguage } from "./contexts/LanguageContext"
 import { FaUserGraduate, FaChalkboardTeacher, FaLock } from "react-icons/fa"
 import "./styles.css"
+import config from "./config";
+
 
 function LoginForm() {
   const theme = {
@@ -56,7 +58,7 @@ function LoginForm() {
     }
 
     try {
-      const res = await fetch("http://192.168.68.112:7069/api/account/login", {
+const res = await fetch(`${config.BASE_URL}/api/account/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -153,7 +155,7 @@ function LoginForm() {
 
           <Components.SignInContainer signinIn={signIn}>
             <Components.Form onSubmit={handleSubmit}>
-              <Components.Title>{t("Student Login")}</Components.Title>
+              <Components.Title>{t("Login Form")}</Components.Title>
               <div className="form-icon">
                 <FaUserGraduate size={40} color="#1b2a49" />
               </div>

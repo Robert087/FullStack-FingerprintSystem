@@ -3,6 +3,7 @@ import { FaEye, FaEyeSlash, FaTrash, FaEdit, FaKey } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './StudentManagement.css';
+import config from "../config"
 
 function DefineDoctorTab() {
   const [doctors, setDoctors] = useState([]);
@@ -20,7 +21,7 @@ function DefineDoctorTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("");
 
-  const BASE_URL = 'http://192.168.68.112:7069';
+  const BASE_URL = config.BASE_URL
 
   const fetchDoctors = async () => {
     try {
