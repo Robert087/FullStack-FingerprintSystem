@@ -1,5 +1,5 @@
 const config = {
-  BASE_URL: "http://192.168.68.112:7069"
+  BASE_URL: "http://localhost:7069"
 };
 
 export default config;

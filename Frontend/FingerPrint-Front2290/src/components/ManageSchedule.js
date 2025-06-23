@@ -13,6 +13,7 @@ function ManageSchedule() {
   const [filteredYears, setFilteredYears] = useState([]);
 
   const [courses, setCourses] = useState([]);
+  const [doctors, setDoctors] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [newRoom, setNewRoom] = useState("");
 
@@ -42,8 +43,16 @@ function ManageSchedule() {
 
     fetch(`${BASE_URL}/api/Subjects/GetAllSubjects`)
       .then(res => res.json())
-      .then(data => setCourses(data))
+      .then(data => {
+        console.log("✅ Courses:", data);
+        setCourses(data);
+      })
       .catch(err => console.error("Error loading subjects:", err));
+
+    fetch(`${BASE_URL}/api/Doctors/GetAllDoctors`)
+      .then(res => res.json())
+      .then(data => setDoctors(data))
+      .catch(err => console.error("Error loading doctors:", err));
 
     fetchRooms();
   }, []);
@@ -142,25 +151,24 @@ function ManageSchedule() {
         </select>
 
         <select value={form.course} onChange={(e) => setForm({ ...form, course: e.target.value })}>
-          <option value="" disabled>Select Course</option>
-          {courses.map((c, i) => (
-            <option key={i} value={c.name}>{c.name}</option>
-          ))}
-        </select>
+  <option value="" disabled>Select Course</option>
+  {courses.map((c, i) => (
+    <option key={i} value={c.subName}>{c.subName}</option>
+  ))}
+</select>
+
 
         <select value={form.doctor} onChange={(e) => setForm({ ...form, doctor: e.target.value })}>
           <option value="" disabled>Select Doctor</option>
-          {courses
-            .filter((c) => c.name === form.course)
-            .map((c, i) => (
-              <option key={i} value={c.doctorEmail}>{c.doctorEmail}</option>
-            ))}
+          {doctors.map((d) => (
+            <option key={d.id} value={d.id}>{d.dr_NameAr}</option>
+          ))}
         </select>
 
         <select value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })}>
           <option value="" disabled>Select Room</option>
-          {rooms.map((room, i) => (
-            <option key={i} value={room.room_Num}>{room.room_Num}</option>
+          {rooms.map((room) => (
+            <option key={room.id} value={room.room_Num}>{room.room_Num}</option>
           ))}
         </select>
 

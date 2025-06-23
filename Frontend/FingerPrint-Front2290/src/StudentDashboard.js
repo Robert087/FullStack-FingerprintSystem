@@ -73,28 +73,37 @@ function StudentDashboard() {
   const [courseFilter, setCourseFilter] = useState("all")
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const profile = await fetchStudentProfile()
-        const table = await fetchTimeTable()
-        const summary = await fetchAttendanceSummary()
-        const logs = await fetchFingerprintLogs()
-        const courseList = await fetchCourseAttendance()
+  const loadData = async () => {
+    try {
+      const profile = await fetchStudentProfile()
 
+      if (profile) {
         setStudent(profile)
-        setTimeTable(table)
-        setAttendanceSummary(summary)
-        setFingerprintLogs(logs)
-        setCourses(courseList)
-
-        const today = new Date().toISOString().slice(0, 10)
-        const scannedToday = logs.some((log) => log.date === today && log.result === "Success")
-        setFingerprintTodayScanned(scannedToday)
-      } catch (error) {
-        console.error("Error loading student data:", error)
+        localStorage.setItem("studentData", JSON.stringify(profile))  // ← ضيف دي كمان عشان تتخزن
+      } else {
+        console.warn("No student profile returned")
+        setStudent({})
       }
+
+      // باقي الفيتشات
+      const table = await fetchTimeTable()
+      const summary = await fetchAttendanceSummary()
+      const logs = await fetchFingerprintLogs()
+      const courseList = await fetchCourseAttendance()
+
+      setTimeTable(table)
+      setAttendanceSummary(summary)
+      setFingerprintLogs(logs)
+      setCourses(courseList)
+
+      const today = new Date().toISOString().slice(0, 10)
+      const scannedToday = logs.some((log) => log.date === today && log.result === "Success")
+      setFingerprintTodayScanned(scannedToday)
+    } catch (error) {
+      console.error("Error loading student data:", error)
     }
-    loadData()
+  }
+  loadData()
 
     // Close dropdown when clicking outside
     const handleClickOutside = (event) => {

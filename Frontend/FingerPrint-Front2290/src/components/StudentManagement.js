@@ -6,7 +6,6 @@ import './StudentManagement.css';
 import config from "../config"
 
 function StudentManagement() {
-  
   const [students, setStudents] = useState([]);
   const [studentNameEn, setStudentNameEn] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
@@ -19,15 +18,18 @@ function StudentManagement() {
 
   const [selectedFacultyId, setSelectedFacultyId] = useState("");
   const [selectedFacultyYearId, setSelectedFacultyYearId] = useState("");
+  const [selectedSemesterId, setSelectedSemesterId] = useState("");
 
   const [faculties, setFaculties] = useState([]);
   const [facultyYears, setFacultyYears] = useState([]);
   const [filteredFacultyYears, setFilteredFacultyYears] = useState([]);
+  const [semesters, setSemesters] = useState([]);
+  const [filteredSemesters, setFilteredSemesters] = useState([]);
 
   const [filterFaculty, setFilterFaculty] = useState("");
   const [filterYear, setFilterYear] = useState("");
 
-  const BASE_URL = config.BASE_URL
+  const BASE_URL = config.BASE_URL;
 
   const fetchData = async () => {
     try {
@@ -42,6 +44,11 @@ function StudentManagement() {
       const yearsRes = await fetch(`${BASE_URL}/api/FacultyYear/GetAllFacultyYear`);
       const yearsData = await yearsRes.json();
       setFacultyYears(yearsData);
+
+      const semRes = await fetch(`${BASE_URL}/api/FacultyYearSemister/GetAllSemisters`);
+      const semData = await semRes.json();
+      setSemesters(semData);
+
     } catch {
       toast.error("❌ Failed to load initial data");
     }
@@ -49,12 +56,8 @@ function StudentManagement() {
 
   useEffect(() => {
     fetchData();
+    resetForm();
   }, []);
-
-  useEffect(() => {
-  resetForm();
-}, []);
-
 
   useEffect(() => {
     if (selectedFacultyId) {
@@ -64,10 +67,29 @@ function StudentManagement() {
       setFilteredFacultyYears([]);
     }
     setSelectedFacultyYearId("");
+    setSelectedSemesterId("");
   }, [selectedFacultyId, facultyYears]);
+
+  useEffect(() => {
+    if (selectedFacultyYearId) {
+      const filtered = semesters.filter(s => s.facultyYearId === parseInt(selectedFacultyYearId));
+      setFilteredSemesters(filtered);
+    } else {
+      setFilteredSemesters([]);
+    }
+    setSelectedSemesterId("");
+  }, [selectedFacultyYearId, semesters]);
 
   const getFacultyNameById = (id) => faculties.find(f => f.id === parseInt(id))?.fac_Name || "";
   const getFacultyYearStringById = (id) => facultyYears.find(f => f.id === parseInt(id))?.year || "";
+  const getSemesterNameById = (id) => semesters.find(s => s.id === parseInt(id))?.sem_Name || "";
+
+  const getFacultyNameBySemId = (semId) => {
+    const sem = semesters.find(s => s.id === semId);
+    const facultyYear = facultyYears.find(y => y.id === sem?.facultyYearId);
+    const faculty = faculties.find(f => f.id === facultyYear?.facultyId);
+    return faculty?.fac_Name || "";
+  };
 
   const generatePassword = () => {
     const facultyCode = getFacultyNameById(selectedFacultyId).split(" ")[2] || "Dept";
@@ -75,19 +97,25 @@ function StudentManagement() {
   };
 
   const addOrUpdateStudent = async () => {
-    if (!studentCode || !studentNameEn || !studentEmail || !selectedFacultyId || !selectedFacultyYearId) {
+    if (!studentCode || !studentNameEn || !studentEmail || !selectedFacultyId || !selectedFacultyYearId || !selectedSemesterId) {
       toast.warning("Please fill in all required fields");
       return;
     }
 
     if (!studentPassword || studentPassword.length < 6) {
-      toast.error("❌ Please enter a valid password with at least 6 characters");
+      toast.error("❌ Password must be at least 6 characters");
       return;
     }
 
     const codeExists = students.some(s => s.st_Code === studentCode && s.id !== editStudentId);
+    const emailExists = students.some(s => s.st_Email === studentEmail && s.id !== editStudentId);
+
     if (codeExists) {
       toast.error("❌ Student code already exists");
+      return;
+    }
+    if (emailExists) {
+      toast.error("❌ Email already exists");
       return;
     }
 
@@ -101,17 +129,12 @@ function StudentManagement() {
       phone: studentPhone,
       fac_ID: parseInt(selectedFacultyId),
       Faculty: getFacultyNameById(selectedFacultyId),
-      facYearSem_ID: parseInt(selectedFacultyYearId),
-      FacultyYearSemister: getFacultyYearStringById(selectedFacultyYearId)
+      facYearSem_ID: parseInt(selectedSemesterId),
+      FacultyYearSemister: getFacultyYearStringById(selectedFacultyYearId),
+      Semester: getSemesterNameById(selectedSemesterId)
     };
 
     try {
-      await fetch(`${BASE_URL}/api/Studets/Add_OR_UpdateStudent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dto)
-      });
-
       if (!isEditMode) {
         const userDto = {
           displayName: studentNameEn,
@@ -136,6 +159,12 @@ function StudentManagement() {
         }
       }
 
+      await fetch(`${BASE_URL}/api/Studets/Add_OR_UpdateStudent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dto)
+      });
+
       resetForm();
       await fetchData();
       toast.success(`✅ Student ${isEditMode ? "updated" : "added"} successfully`);
@@ -144,18 +173,18 @@ function StudentManagement() {
     }
   };
 
-const resetForm = () => {
-  setStudentCode("");
-  setStudentNameEn("");
-  setStudentEmail("");
-  setStudentPhone("");
-  setStudentPassword("");
-  setSelectedFacultyId("");
-  setSelectedFacultyYearId("");
-  setIsEditMode(false);
-  setEditStudentId(null);
-};
-
+  const resetForm = () => {
+    setStudentCode("");
+    setStudentNameEn("");
+    setStudentEmail("");
+    setStudentPhone("");
+    setStudentPassword("");
+    setSelectedFacultyId("");
+    setSelectedFacultyYearId("");
+    setSelectedSemesterId("");
+    setIsEditMode(false);
+    setEditStudentId(null);
+  };
 
   const deleteStudent = async (id) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this student?");
@@ -175,17 +204,27 @@ const resetForm = () => {
     setStudentEmail(student.st_Email);
     setStudentPhone(student.phone);
     setSelectedFacultyId(student.fac_ID);
-    setSelectedFacultyYearId(student.facYearSem_ID);
+    const yearId = facultyYears.find(fy => fy.id === semesters.find(s => s.id === student.facYearSem_ID)?.facultyYearId)?.id || "";
+    setSelectedFacultyYearId(yearId);
+    setSelectedSemesterId(student.facYearSem_ID);
     setIsEditMode(true);
     setEditStudentId(student.id);
     toast.info("✏️ You can now edit the student data");
   };
 
   const filteredStudents = students.filter(s => {
-    const byFaculty = filterFaculty ? s.faculty === getFacultyNameById(filterFaculty) : true;
-    const byYear = filterYear ? getFacultyYearStringById(s.facYearSem_ID) === getFacultyYearStringById(filterYear) : true;
+    const semester = semesters.find(sm => sm.id === s.facYearSem_ID);
+    const facultyYear = facultyYears.find(fy => fy.id === semester?.facultyYearId);
+
+    const byFaculty = filterFaculty ? facultyYear?.facultyId === parseInt(filterFaculty) : true;
+    const byYear = filterYear ? facultyYear?.id === parseInt(filterYear) : true;
+
     return byFaculty && byYear;
   });
+
+  const filteredYearsForFilter = filterFaculty
+    ? facultyYears.filter(fy => fy.facultyId === parseInt(filterFaculty))
+    : facultyYears;
 
   return (
     <div className="dashboard-card">
@@ -193,10 +232,10 @@ const resetForm = () => {
       <div className="card-header"><h3>Student Management</h3></div>
 
       <div className="form-row" style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "20px" }}>
-        <input className="course-input" style={{ flex: "1 1 100px" }} placeholder="Student Code" value={studentCode} onChange={(e) => setStudentCode(e.target.value)} />
-        <input className="course-input" style={{ flex: "2 1 200px" }} placeholder="Student Name (English)" value={studentNameEn} onChange={(e) => setStudentNameEn(e.target.value)} />
-        <input className="course-input" style={{ flex: "2 1 200px" }} placeholder="Student Email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)} />
-        <input className="course-input" style={{ flex: "1 1 150px" }} placeholder="Phone (Optional)" value={studentPhone} onChange={(e) => setStudentPhone(e.target.value)} />
+        <input className="course-input" placeholder="Student Code" value={studentCode} onChange={(e) => setStudentCode(e.target.value)} />
+        <input className="course-input" placeholder="Student Name (English)" value={studentNameEn} onChange={(e) => setStudentNameEn(e.target.value)} />
+        <input className="course-input" placeholder="Student Email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)} />
+        <input className="course-input" placeholder="Phone (Optional)" value={studentPhone} onChange={(e) => setStudentPhone(e.target.value)} />
 
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <input className="course-input" type={showPassword ? "text" : "password"} placeholder="Password" value={studentPassword} onChange={(e) => setStudentPassword(e.target.value)} />
@@ -214,6 +253,11 @@ const resetForm = () => {
           {filteredFacultyYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
         </select>
 
+        <select className="course-input" value={selectedSemesterId} onChange={(e) => setSelectedSemesterId(e.target.value)}>
+          <option value="">Select Semester</option>
+          {filteredSemesters.map(s => <option key={s.id} value={s.id}>{s.sem_Name}</option>)}
+        </select>
+
         <button className="action-button" onClick={addOrUpdateStudent}>{isEditMode ? "Update" : "Add"} Student</button>
       </div>
 
@@ -224,7 +268,7 @@ const resetForm = () => {
         </select>
         <select className="course-input" value={filterYear} onChange={(e) => setFilterYear(e.target.value)}>
           <option value="">All Academic Years</option>
-          {facultyYears.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
+          {filteredYearsForFilter.map(y => <option key={y.id} value={y.id}>{y.year}</option>)}
         </select>
       </div>
 
@@ -238,12 +282,13 @@ const resetForm = () => {
               <th>Phone</th>
               <th>Faculty</th>
               <th>Academic Year</th>
+              <th>Semester</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredStudents.length === 0 ? (
-              <tr><td colSpan="7" style={{ textAlign: "center" }}>No students found.</td></tr>
+              <tr><td colSpan="8" style={{ textAlign: "center" }}>No students found.</td></tr>
             ) : (
               filteredStudents.map((s) => (
                 <tr key={s.id}>
@@ -251,8 +296,9 @@ const resetForm = () => {
                   <td>{s.st_NameEn}</td>
                   <td>{s.st_Email}</td>
                   <td>{s.phone}</td>
-                  <td>{s.faculty}</td>
-                  <td>{getFacultyYearStringById(s.facYearSem_ID)}</td>
+                  <td>{getFacultyNameBySemId(s.facYearSem_ID)}</td>
+                  <td>{getFacultyYearStringById(facultyYears.find(fy => fy.id === semesters.find(sm => sm.id === s.facYearSem_ID)?.facultyYearId)?.id)}</td>
+                  <td>{getSemesterNameById(s.facYearSem_ID)}</td>
                   <td>
                     <button className="edit-button" onClick={() => startEdit(s)}><FaEdit /></button>
                     <button className="delete-button" onClick={() => deleteStudent(s.id)}><FaTrash /></button>

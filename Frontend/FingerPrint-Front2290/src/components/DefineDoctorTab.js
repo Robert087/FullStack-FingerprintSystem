@@ -3,7 +3,7 @@ import { FaEye, FaEyeSlash, FaTrash, FaEdit, FaKey } from 'react-icons/fa';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './StudentManagement.css';
-import config from "../config"
+import config from "../config";
 
 function DefineDoctorTab() {
   const [doctors, setDoctors] = useState([]);
@@ -13,7 +13,6 @@ function DefineDoctorTab() {
   const [doctorPhone, setDoctorPhone] = useState("");
   const [doctorPassword, setDoctorPassword] = useState("");
   const [doctorDepartment, setDoctorDepartment] = useState("");
-  const [facultyId, setFacultyId] = useState("");
   const [departments, setDepartments] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -21,7 +20,7 @@ function DefineDoctorTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("");
 
-  const BASE_URL = config.BASE_URL
+  const BASE_URL = config.BASE_URL;
 
   const fetchDoctors = async () => {
     try {
@@ -66,8 +65,8 @@ function DefineDoctorTab() {
       Dr_Email: doctorEmail,
       Phone: doctorPhone,
       Dr_Image: "",
-      Department: departments.find(d => d.id === parseInt(doctorDepartment))?.fac_Name || "",
-      FacultyId: parseInt(doctorDepartment)
+      Faculty: departments.find(d => d.id === parseInt(doctorDepartment))?.fac_Name || "",
+      Fac_ID: parseInt(doctorDepartment)
     };
 
     try {
@@ -115,7 +114,6 @@ function DefineDoctorTab() {
     setDoctorPhone("");
     setDoctorPassword("");
     setDoctorDepartment("");
-    setFacultyId("");
     setIsEditMode(false);
     setEditDoctorId(null);
   };
@@ -125,7 +123,7 @@ function DefineDoctorTab() {
     setDoctorName(doctor.dr_NameAr);
     setDoctorEmail(doctor.dr_Email);
     setDoctorPhone(doctor.phone);
-    setDoctorDepartment(doctor.facultyId);
+    setDoctorDepartment(doctor.fac_ID); // ✅ استخدام الحقل الصحيح
     setIsEditMode(true);
     setEditDoctorId(doctor.id);
     toast.info("✏️ You can now edit the doctor data");
@@ -147,7 +145,7 @@ function DefineDoctorTab() {
     const matchesSearch = doc.dr_NameAr.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           doc.dr_Email.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           doc.dr_Code?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesDepartment = filterDepartment ? doc.facultyId === parseInt(filterDepartment) : true;
+    const matchesDepartment = filterDepartment ? doc.fac_ID === parseInt(filterDepartment) : true;
     return matchesSearch && matchesDepartment;
   });
 
@@ -203,7 +201,7 @@ function DefineDoctorTab() {
                 <td>{doc.dr_NameAr}</td>
                 <td>{doc.dr_Email}</td>
                 <td>{doc.phone}</td>
-                <td>{doc.department || doc.facultyId}</td>
+                <td>{doc.faculty}</td>
                 <td>
                   <button className="edit-button" onClick={() => startEdit(doc)}><FaEdit /></button>
                   <button className="delete-button" onClick={() => deleteDoctor(doc.id)}><FaTrash /></button>

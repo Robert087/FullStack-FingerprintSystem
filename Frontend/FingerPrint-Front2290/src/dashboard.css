@@ -516,6 +516,15 @@ html[dir="rtl"] .language-toggle-container {
   box-shadow: var(--shadow-md);
 }
 
+
+
+.stat-icon.students {
+  background-color: #2196f3;
+}
+.stat-card:has(.students) {
+  border-left-color: var(--primary-light);
+}
+
 .stat-icon {
   width: 60px;
   height: 60px;
